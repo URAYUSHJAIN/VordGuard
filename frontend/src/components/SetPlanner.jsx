@@ -106,11 +106,16 @@ function SetObject({ item, isSelected, onSelect, onChange, onDelete }) {
  * Main Set Planner Component
  */
 function SetPlanner() {
+  const stageRef = useRef(null)
+  
   // Canvas state
   const [objects, setObjects] = useState([])
   const [selectedId, setSelectedId] = useState(null)
-  const [stageScale, setStageScale] = useState(1)
-  const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
+  
+  // AI State
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generationError, setGenerationError] = useState(null)
   
   // Canvas dimensions
   const canvasWidth = 800
@@ -119,12 +124,75 @@ function SetPlanner() {
   // Grid settings
   const gridSize = 50
 
+  // NEW: Download Map
+  const downloadMap = () => {
+    if (stageRef.current) {
+      const uri = stageRef.current.toDataURL({ pixelRatio: 2 });
+      const link = document.createElement('a');
+      link.download = `set-plan-${new Date().toISOString().slice(0,10)}.png`;
+      link.href = uri;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  }
+
+  // NEW: AI Layout Generation
+  const generateLayoutWithAI = async () => {
+    if (!aiPrompt.trim()) return;
+    
+    setIsGenerating(true)
+    setGenerationError(null)
+
+    try {
+      const response = await fetch('/api/ai/set-layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sceneDescription: aiPrompt })
+      })
+      
+      const result = await response.json()
+      
+      if (result.success && result.data.layout) {
+        // Map AI items to catalog templates
+        const newObjects = result.data.layout.map(aiItem => {
+          let template = null;
+          // Search across all categories
+          Object.values(EQUIPMENT_CATALOG).forEach(categoryItems => {
+             const found = categoryItems.find(t => t.id === aiItem.type)
+             if (found) template = found;
+          });
+
+          // Fallback
+          if (!template) template = EQUIPMENT_CATALOG.props[2]; 
+
+          return {
+            ...template,
+            id: uuidv4(),
+            x: aiItem.x || 400,
+            y: aiItem.y || 300,
+            name: aiItem.label || template.name
+          }
+        });
+        
+        setObjects(newObjects);
+      } else {
+        setGenerationError("AI failed to generate a valid layout.")
+      }
+    } catch (err) {
+      setGenerationError("Failed to connect to AI service.")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   /**
    * Add equipment to canvas
    */
   const addObject = (template) => {
     const newObject = {
       ...template,
+      type: template.id, // Store original ID for complexity calculation
       id: uuidv4(),
       x: canvasWidth / 2 + Math.random() * 100 - 50,
       y: canvasHeight / 2 + Math.random() * 100 - 50,
@@ -213,9 +281,12 @@ function SetPlanner() {
    * Used for Scene Intelligence integration
    */
   const calculateSetComplexity = () => {
-    const cameraCount = objects.filter(o => o.id.includes('camera')).length
-    const lightCount = objects.filter(o => o.id.includes('light') || o.id.includes('reflector')).length
-    const crewCount = objects.filter(o => ['director', 'dp', 'actor', 'crew'].some(c => o.id.includes(c))).length
+    // Use type property for accurate counting (id is UUID)
+    const getType = (o) => o.type || o.id
+
+    const cameraCount = objects.filter(o => getType(o).includes('camera')).length
+    const lightCount = objects.filter(o => getType(o).includes('light') || getType(o).includes('reflector')).length
+    const crewCount = objects.filter(o => ['director', 'dp', 'actor', 'crew'].some(c => getType(o).includes(c))).length
     
     let complexity = 'LOW'
     let score = 20
@@ -237,10 +308,45 @@ function SetPlanner() {
   return (
     <div className="set-planner">
       {/* Header */}
-      <div className="set-planner-header">
-        <h2>🎬 Set Layout Planner</h2>
-        <p>Plan your set visually. Drag equipment onto canvas.</p>
+      <div className="set-planner-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <h2>🎬 Set Layout Planner</h2>
+          <p>Plan your set visually. Drag equipment onto canvas.</p>
+        </div>
+        <button className="btn btn-outline" onClick={downloadMap} style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}>
+          📥 Download Map
+        </button>
       </div>
+
+      {/* AI Controls */}
+      <div className="ai-controls-bar" style={{ 
+          marginBottom: '1rem', 
+          padding: '1rem', 
+          background: 'var(--bg-card)', 
+          borderRadius: 'var(--radius-md)', 
+          display: 'flex', 
+          gap: '1rem',
+          alignItems: 'center',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+        <input 
+          type="text" 
+          className="form-control" 
+          placeholder="Describe scene for AI Layout (e.g., 'Interrogation scene with single overhead light')"
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          style={{ flex: 1 }}
+          onKeyDown={(e) => e.key === 'Enter' && generateLayoutWithAI()}
+        />
+        <button 
+          className="btn btn-primary" 
+          onClick={generateLayoutWithAI} 
+          disabled={isGenerating || !aiPrompt.trim()}
+        >
+          {isGenerating ? '✨ Generating...' : '✨ AI Suggest Layout'}
+        </button>
+      </div>
+      {generationError && <p className="error-text" style={{ color: 'var(--accent-danger)', marginBottom: '1rem' }}>{generationError}</p>}
 
       <div className="set-planner-layout">
         {/* Equipment Toolbox */}
@@ -280,6 +386,7 @@ function SetPlanner() {
         {/* Canvas Area */}
         <div className="set-canvas-container">
           <Stage
+            ref={stageRef}
             width={canvasWidth}
             height={canvasHeight}
             style={{ backgroundColor: '#1a1a2e', borderRadius: '8px' }}
@@ -338,16 +445,88 @@ function SetPlanner() {
 
           <div className="complexity-breakdown">
             <div className="breakdown-item">
-              <span>🎥 Cameras</span>
-              <span>{setComplexity.cameraCount}</span>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>🎥 Cameras</span>
+                <button 
+                  onClick={() => addObject(EQUIPMENT_CATALOG.cameras[0])}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)', 
+                    border: 'none', 
+                    borderRadius: '4px', 
+                    cursor: 'pointer', 
+                    padding: '0 8px',
+                    color: '#fff',
+                    lineHeight: '1.5'
+                  }}
+                  title="Add Camera"
+                >+</button>
+              </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>{setComplexity.cameraCount}</span>
+                {setComplexity.cameraCount > 0 && (
+                  <button 
+                    onClick={() => setObjects(objects.filter(o => !(o.type || o.id).includes('camera')))}
+                    style={{background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 0, fontSize: '10px'}}
+                    title="Clear Cameras"
+                  >❌</button>
+                )}
+              </div>
             </div>
             <div className="breakdown-item">
-              <span>💡 Lights</span>
-              <span>{setComplexity.lightCount}</span>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>💡 Lights</span>
+                <button 
+                  onClick={() => addObject(EQUIPMENT_CATALOG.lighting[0])}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)', 
+                    border: 'none', 
+                    borderRadius: '4px', 
+                    cursor: 'pointer', 
+                    padding: '0 8px',
+                    color: '#fff',
+                    lineHeight: '1.5'
+                  }}
+                  title="Add Light"
+                >+</button>
+              </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>{setComplexity.lightCount}</span>
+                {setComplexity.lightCount > 0 && (
+                  <button 
+                    onClick={() => setObjects(objects.filter(o => !((o.type || o.id).includes('light') || (o.type || o.id).includes('reflector'))))}
+                    style={{background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 0, fontSize: '10px'}}
+                    title="Clear Lights"
+                  >❌</button>
+                )}
+              </div>
             </div>
             <div className="breakdown-item">
-              <span>👥 Crew Positions</span>
-              <span>{setComplexity.crewCount}</span>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>👥 Crew Positions</span>
+                <button 
+                  onClick={() => addObject(EQUIPMENT_CATALOG.crew[3])} 
+                  style={{
+                    background: 'rgba(255,255,255,0.1)', 
+                    border: 'none', 
+                    borderRadius: '4px', 
+                    cursor: 'pointer', 
+                    padding: '0 8px',
+                    color: '#fff',
+                    lineHeight: '1.5'
+                  }}
+                  title="Add Crew"
+                >+</button>
+              </div>
+              <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+                <span>{setComplexity.crewCount}</span>
+                {setComplexity.crewCount > 0 && (
+                  <button 
+                    onClick={() => setObjects(objects.filter(o => !['director', 'dp', 'actor', 'crew'].some(c => (o.type || o.id).includes(c))))}
+                    style={{background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', padding: 0, fontSize: '10px'}}
+                    title="Clear Crew"
+                  >❌</button>
+                )}
+              </div>
             </div>
             <div className="breakdown-item">
               <span>📦 Total Objects</span>

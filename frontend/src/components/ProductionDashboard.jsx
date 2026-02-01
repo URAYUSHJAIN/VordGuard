@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import Hero3D from './Hero3D'
+import LocationMap from './LocationMap'
 
 function ProductionCalendar({ selectedDate, onDateSelect }) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -93,121 +94,53 @@ function ScheduleList() {
   ]
   
   return (
-    <div className="schedule-list">
-      {scheduleItems.map(item => (
-        <div key={item.id} className="schedule-item">
-          <div className="schedule-time">
-            <span className="time-marker"></span>
-            <span className="time-text">{item.time.split(' - ')[0]}</span>
-          </div>
-          <div className="schedule-content">
-            <div className="schedule-info">
-              <h4>{item.title}</h4>
-              <p>{item.time} • {item.location}</p>
+    <div className="schedule-list-card">
+      <h3 className="card-header-title">Today's Schedule</h3>
+      <div className="schedule-list">
+        {scheduleItems.map(item => (
+          <div key={item.id} className="schedule-item">
+            <div className="schedule-time">
+              <span className="time-marker"></span>
+              <span className="time-text">{item.time.split(' - ')[0]}</span>
             </div>
-            <div className={`schedule-status ${item.status === 'sold' ? 'wrapped' : ''}`}>
-              {item.status === 'sold' ? (
-                <span className="status-wrapped">WRAPPED</span>
-              ) : (
-                <div className="status-progress">
-                  <svg viewBox="0 0 36 36">
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="#eee"
-                      strokeWidth="3"
-                    />
-                    <path
-                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      fill="none"
-                      stroke="#FF6B35"
-                      strokeWidth="3"
-                      strokeDasharray={`${item.status}, 100`}
-                    />
-                  </svg>
-                  <span>{item.statusText}</span>
-                </div>
-              )}
+            <div className="schedule-content">
+              <div className="schedule-info">
+                <h4>{item.title}</h4>
+                <p>{item.time} • {item.location}</p>
+              </div>
+              <div className={`schedule-status ${item.status === 'sold' ? 'wrapped' : ''}`}>
+                {item.status === 'sold' ? (
+                  <span className="status-wrapped">WRAPPED</span>
+                ) : (
+                  <div className="status-progress">
+                    <svg viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#eee"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#FF6B35"
+                        strokeWidth="3"
+                        strokeDasharray={`${item.status}, 100`}
+                      />
+                    </svg>
+                    <span>{item.statusText}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
 
-function LocationMap() {
-  const rows = 8
-  const cols = 12
-  const locationGrid = []
-  
-  const getZoneStatus = (row, col) => {
-    const centerCol = cols / 2
-    const distFromCenter = Math.abs(col - centerCol)
-    const maxInRow = Math.max(2, Math.floor((rows - row) * 1.2))
-    
-    if (distFromCenter > maxInRow + 2) return 'hidden'
-    
-    const rand = (row * cols + col) % 10
-    if (rand < 4) return 'available'
-    if (rand < 7) return 'pending'
-    return 'booked'
-  }
-  
-  for (let r = 0; r < rows; r++) {
-    const rowCells = []
-    for (let c = 0; c < cols; c++) {
-      rowCells.push({
-        row: r,
-        col: c,
-        status: getZoneStatus(r, c)
-      })
-    }
-    locationGrid.push(rowCells)
-  }
-  
-  return (
-    <div className="location-map">
-      <div className="map-header">
-        <h3>AI Location Scout <span className="dropdown-arrow">▼</span></h3>
-        <button className="map-menu">•••</button>
-      </div>
-      
-      <div className="map-screen">
-        <div className="screen-label">Main Stage</div>
-        <div className="screen-curve"></div>
-      </div>
-      
-      <div className="map-grid">
-        {locationGrid.map((row, rIdx) => (
-          <div key={rIdx} className="map-row">
-            {row.map((cell, cIdx) => (
-              <div 
-                key={cIdx}
-                className={`map-cell ${cell.status}`}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
-      
-      <div className="map-legend">
-        <div className="legend-item">
-          <span className="legend-dot available"></span>
-          <span>Available</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot pending"></span>
-          <span>Pending</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-dot booked"></span>
-          <span>Booked</span>
-        </div>
-      </div>
-    </div>
-  )
-}
+// LocationMap moved to separate component
 
 function BudgetStats() {
   const weeklyData = [
@@ -223,7 +156,7 @@ function BudgetStats() {
   const maxValue = 100
   
   return (
-    <div className="budget-stats">
+    <div className="budget-stats-card">
       <div className="stats-header">
         <h3>AI Cost Forecast</h3>
         <div className="stats-actions">
@@ -375,20 +308,20 @@ function ProjectHealth() {
 
 function QuickActions({ onNavigate }) {
   const actions = [
-    { id: 'crisis', icon: '🚨', label: 'Report Crisis', color: '#FF6B35' },
-    { id: 'scene-risk', icon: '📊', label: 'Scene Risk', color: '#4ECDC4' },
-    { id: 'set-planner', icon: '🎬', label: 'Set Planner', color: '#45B7D1' },
-    { id: 'shot-list', icon: '🤖', label: 'Shot List AI', color: '#96CEB4' },
+    { id: 'crisis', icon: '🚨', label: 'Report Crisis', color: '#EF4444' }, // Red for urgency
+    { id: 'scene-risk', icon: '📊', label: 'Scene Risk', color: '#10B981' }, // Green for analysis
+    { id: 'set-planner', icon: '🎬', label: 'Set Planner', color: '#3B82F6' }, // Blue for planning
+    { id: 'shot-list', icon: '🤖', label: 'AI Shot List', color: '#8B5CF6' }, // Purple for AI
   ]
   
   return (
-    <div className="quick-actions">
+    <div className="quick-actions-grid">
       {actions.map(action => (
         <button 
           key={action.id}
-          className="quick-action-btn"
+          className="quick-action-card"
           onClick={() => onNavigate(action.id)}
-          style={{ '--action-color': action.color }}
+          style={{ borderTop: `4px solid ${action.color}` }}
         >
           <span className="action-icon">{action.icon}</span>
           <span className="action-label">{action.label}</span>
@@ -403,8 +336,305 @@ function ProductionDashboard({ onNavigate }) {
   
   return (
     <div className="production-dashboard">
+      <style>{`
+        .production-dashboard {
+          display: grid;
+          grid-template-columns: 350px 1fr 300px;
+          gap: 1.5rem;
+          padding-bottom: 2rem;
+          background-color: #f0f2f5;
+        }
+
+        .card {
+          background-color: #ffffff;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .card-header-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1a202c;
+          margin-bottom: 16px;
+        }
+
+        /* Schedule List Card */
+        .schedule-list-card {
+          background-color: #fff;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        .schedule-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .schedule-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 16px;
+        }
+
+        .schedule-time {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          flex-shrink: 0;
+        }
+
+        .time-marker {
+          width: 12px;
+          height: 12px;
+          background-color: #CBD5E0;
+          border-radius: 50%;
+          margin-bottom: 4px;
+        }
+        
+        .schedule-item:first-child .time-marker {
+            background-color: #FF6B35;
+        }
+
+        .time-text {
+          font-size: 12px;
+          color: #718096;
+          font-weight: 500;
+        }
+
+        .schedule-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 100%;
+          background-color: #F7FAFC;
+          border-radius: 8px;
+          padding: 12px;
+        }
+
+        .schedule-info h4 {
+          font-size: 14px;
+          font-weight: 600;
+          color: #2D3748;
+          margin: 0 0 4px 0;
+        }
+
+        .schedule-info p {
+          font-size: 12px;
+          color: #A0AEC0;
+          margin: 0;
+        }
+
+        .schedule-status.wrapped .status-wrapped {
+          background-color: #E6FFFA;
+          color: #38B2AC;
+          font-weight: 600;
+          padding: 4px 8px;
+          border-radius: 12px;
+          font-size: 12px;
+        }
+
+        .status-progress {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .status-progress svg {
+          width: 36px;
+          height: 36px;
+        }
+        
+        .status-progress span {
+            font-size: 12px;
+            font-weight: 700;
+            color: #FF6B35;
+        }
+
+        /* Budget Stats Card */
+        .budget-stats-card {
+          background-color: #fff;
+          border-radius: 16px;
+          padding: 20px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+          display: flex;
+          flex-direction: column;
+        }
+
+        .stats-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .stats-header h3 {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1a202c;
+          margin: 0;
+        }
+
+        .stats-actions .action-btn {
+          background: #F7FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 6px;
+          color: #718096;
+          width: 28px;
+          height: 28px;
+          margin-left: 8px;
+          cursor: pointer;
+        }
+
+        .stats-summary {
+          display: flex;
+          gap: 24px;
+          margin-bottom: 24px;
+        }
+
+        .stat-item {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .stat-value {
+          font-size: 20px;
+          font-weight: 700;
+          color: #2D3748;
+        }
+
+        .stat-label {
+          font-size: 12px;
+          color: #A0AEC0;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .stat-label .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+        .stat-label .dot.production { background-color: #4299E1; }
+        .stat-label .dot.other { background-color: #A0AEC0; }
+
+        .stats-chart {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          height: 120px; /* Adjust as needed */
+        }
+
+        .chart-bar-group {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8px;
+          width: calc(100% / 7 - 8px);
+        }
+
+        .bar-container {
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          gap: 4px;
+          width: 100%;
+          height: 100%;
+        }
+
+        .bar {
+          width: 40%;
+          border-radius: 4px;
+        }
+        
+        .bar.primary { background-color: #4299E1; }
+        .bar.secondary { background-color: #A0AEC0; }
+
+        .bar-label {
+          font-size: 12px;
+          color: #718096;
+          font-weight: 500;
+        }
+
+        .quick-actions-section {
+           grid-column: 1 / -1;
+           margin-bottom: 1rem;
+        }
+        
+        .quick-actions-grid {
+           display: grid;
+           grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: 1rem;
+        }
+
+        .quick-action-card {
+           background: white;
+           padding: 1.25rem;
+           border-radius: var(--radius-md);
+           border: 1px solid var(--border-color);
+           display: flex;
+           flex-direction: column;
+           align-items: center;
+           gap: 0.75rem;
+           cursor: pointer;
+           transition: transform 0.2s, box-shadow 0.2s;
+           box-shadow: var(--shadow-sm);
+        }
+        
+        .quick-action-card:hover {
+           transform: translateY(-3px);
+           box-shadow: var(--shadow-md);
+        }
+
+        .action-icon { font-size: 2rem; }
+        .action-label { font-weight: 700; color: var(--text-primary); font-size: 0.95rem; }
+
+        .dashboard-left, .dashboard-center, .dashboard-right {
+           display: flex;
+           flex-direction: column;
+           gap: 1.5rem;
+        }
+        
+        @media (max-width: 1200px) {
+           .production-dashboard {
+              grid-template-columns: 300px 1fr;
+           }
+           .dashboard-right {
+              grid-column: 1 / -1;
+              display: grid;
+              grid-template-columns: repeat(3, 1fr);
+           }
+        }
+
+        @media (max-width: 900px) {
+           .production-dashboard {
+              grid-template-columns: 1fr;
+           }
+           .dashboard-right {
+              grid-template-columns: 1fr;
+           }
+           /* Mobile-First Stack */
+           .quick-actions-grid {
+              grid-template-columns: repeat(2, 1fr); /* 2x2 grid on mobile */
+           }
+        }
+      `}</style>
+      
       <div style={{ gridColumn: '1 / -1' }}>
         <Hero3D />
+      </div>
+
+      <div className="quick-actions-section">
+         <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ width: '8px', height: '8px', background: '#FF6B35', borderRadius: '50%', display: 'inline-block' }}></span>
+            Operational Command
+         </h3>
+         <QuickActions onNavigate={onNavigate} />
       </div>
       
       <div className="dashboard-left">
@@ -421,9 +651,9 @@ function ProductionDashboard({ onNavigate }) {
       </div>
       
       <div className="dashboard-right">
+        <ProjectHealth />
         <CrewWidget />
         <ActivityHeatmap />
-        <ProjectHealth />
       </div>
     </div>
   )

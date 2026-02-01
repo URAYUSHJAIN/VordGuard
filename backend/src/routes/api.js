@@ -86,7 +86,7 @@ router.post("/analyze-scene-risk", async (req, res) => {
 
     // 1. Try to use AI to generate scene data from description (Real Intelligence)
     if (sceneDescription) {
-      const aiParams = await azureAI.extractSceneParameters(sceneDescription);
+      const aiParams = await azureAI.analyzeSceneDescription(sceneDescription);
       scene = {
         id: sceneId || "custom-scene",
         title: "Custom Scenario",
@@ -255,7 +255,7 @@ router.post("/location-readiness", (req, res) => {
  * Use case: Production crisis hits - generate structured rescue options
  * Producer evaluates 3 options and picks best fit for their budget/timeline/risk tolerance
  */
-router.post("/generate-plan-b", (req, res) => {
+router.post("/generate-plan-b", async (req, res) => {
   try {
     const { crisisId, projectId, scenesToAffect } = req.body;
 
@@ -302,6 +302,38 @@ router.post("/generate-plan-b", (req, res) => {
       primaryScene,
       mockLocations
     );
+
+    // AI VISUALIZATION LAYER: Generate concept frames for each plan
+    // This connects the Logical Engine to the Generative Vision Model
+    try {
+        const enrichedPlans = await Promise.all(
+            planBResponse.planBOptions.map(async (plan) => {
+                try {
+                    // Create a prompt that describes the production scenario visually
+                    const visualPrompt = `Filmmaking concept art: ${plan.planTitle}. Scenario: ${plan.planDescription}. Mood: Cinematic, production planning, storyboard style.`;
+                    
+                    // Call the AI Service
+                    const imageUrl = await azureAI.generateConceptFrame(visualPrompt);
+                    
+                    return {
+                        ...plan,
+                        visualConceptUrl: imageUrl
+                    };
+                } catch (err) {
+                    console.warn(`[AI WARN] Verification failed for plan ${plan.rank}:`, err.message);
+                    // Return plan without visual if AI fails (don't break the whole response)
+                    return {
+                        ...plan,
+                        visualConceptUrl: null 
+                    };
+                }
+            })
+        );
+        planBResponse.planBOptions = enrichedPlans;
+    } catch (enrichmentError) {
+        console.error("Critical failure in AI enrichment:", enrichmentError);
+        // Continue without visuals rather than failing the request
+    }
 
     // Return ranked Plan-B options with producer guidance
     res.json({
@@ -448,6 +480,21 @@ router.post("/ai/plan-b-explanation", async (req, res) => {
 });
 
 /**
+ * GENERATE SUSTAINABILITY MEMO (AI)
+ * POST /api/ai/sustainability-memo
+ */
+router.post("/ai/sustainability-memo", async (req, res) => {
+  try {
+    const { plan } = req.body;
+    const result = await azureAI.generateSustainabilityMemo(plan);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error("AI Route Error:", error);
+    res.status(500).json({ error: "AI Generation Failed" });
+  }
+});
+
+/**
  * GENERATE CONCEPT FRAME (AI - Image)
  * POST /api/ai/concept-frame
  */
@@ -474,6 +521,21 @@ router.post("/ai/pitch-summary", async (req, res) => {
   } catch (error) {
     console.error("AI Route Error:", error);
     res.status(500).json({ error: "AI Generation Failed" });
+  }
+});
+
+/**
+ * GENERATE SET LAYOUT (AI)
+ * POST /api/ai/set-layout
+ */
+router.post("/ai/set-layout", async (req, res) => {
+  try {
+    const { sceneDescription } = req.body;
+    const result = await azureAI.generateSetLayout(sceneDescription);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error("AI Route Error:", error);
+    res.status(500).json({ error: "Layout Generation Failed" });
   }
 });
 

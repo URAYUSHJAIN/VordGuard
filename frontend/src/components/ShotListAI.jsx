@@ -140,7 +140,7 @@ function AIChatPanel({ onGenerateShots, loading }) {
 /**
  * Individual shot card display
  */
-function ShotCard({ shot, index, onUpdate, onDelete }) {
+function ShotCard({ shot, index, onUpdate, onDelete, onDuplicate }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editData, setEditData] = useState(shot)
   
@@ -155,8 +155,8 @@ function ShotCard({ shot, index, onUpdate, onDelete }) {
         <div className="shot-card-header">
           <span className="shot-number">Shot #{index + 1}</span>
           <div className="shot-actions">
-            <button className="btn-icon" onClick={handleSave}>💾</button>
-            <button className="btn-icon" onClick={() => setIsEditing(false)}>✖</button>
+            <button className="btn-icon" onClick={handleSave} title="Save">💾</button>
+            <button className="btn-icon" onClick={() => setIsEditing(false)} title="Cancel">✖</button>
           </div>
         </div>
         
@@ -270,6 +270,7 @@ function ShotCard({ shot, index, onUpdate, onDelete }) {
           <span className="scene-badge">Scene {shot.sceneNumber}: {shot.sceneName}</span>
         </div>
         <div className="shot-actions">
+          <button className="btn-icon" onClick={() => onDuplicate(index)} title="Duplicate">📑</button>
           <button className="btn-icon" onClick={() => setIsEditing(true)} title="Edit">✏️</button>
           <button className="btn-icon danger" onClick={() => onDelete(index)} title="Delete">🗑️</button>
         </div>
@@ -343,37 +344,44 @@ function ShotListAI() {
 
       // Attempt to parse JSON from AI response
       let aiShots = [];
-      try {
-        // Find JSON array in text (model might include chatty text)
-        const jsonMatch = result.data.content.match(/\[[\s\S]*\]/);
-        const jsonString = jsonMatch ? jsonMatch[0] : result.data.content;
-        aiShots = JSON.parse(jsonString);
-      } catch (parseError) {
-        console.warn("AI JSON parse failed, text fallback", parseError);
-        // Fallback: create one shot with the full text
-        aiShots = [{ 
-          shotType: 'Master Shot', 
-          description: result.data.content, 
-          cameraAngle: 'Eye Level', 
-          movement: 'Static' 
-        }];
+      
+      // Check if backend already parsed it (new behavior)
+      if (result.data.shots) {
+         aiShots = result.data.shots;
+      } else {
+         try {
+           // Find JSON array in text (model might include chatty text)
+           const jsonMatch = result.data.content.match(/\[[\s\S]*\]/);
+           const jsonString = jsonMatch ? jsonMatch[0] : result.data.content;
+           aiShots = JSON.parse(jsonString);
+         } catch (parseError) {
+           console.warn("AI JSON parse failed, text fallback", parseError);
+           // Fallback: create one shot with the full text
+           aiShots = [{ 
+             type: 'Master Shot', 
+             description: result.data.content, 
+             angle: 'Eye Level', 
+             movement: 'Static' 
+           }];
+         }
       }
 
       // Map AI format to internal component format
-      const formattedShots = aiShots.map((s, i) => ({
+      const formattedShots = Array.isArray(aiShots) ? aiShots.map((s, i) => ({
         ...EMPTY_SHOT,
         id: `ai-shot-${Date.now()}-${i}`,
         sceneName: 'AI Scene',
         sceneNumber: '1',
         shotNumber: String(i + 1),
-        shotType: s['Shot Size'] || s.shotType || 'Medium Shot',
-        cameraAngle: s['Angle'] || s.cameraAngle || 'Eye Level',
-        movement: s['Movement'] || s.movement || 'Static',
-        description: s['Description'] || s.description || 'No description',
-        location: 'TBD',
-        equipment: 'Standard Kit',
-        setupTime: '15 mins'
-      }));
+        // Robust mapping for various key styles
+        shotType: s.type || s.shotType || s['Shot Size'] || 'Medium Shot',
+        cameraAngle: s.angle || s.cameraAngle || s['Angle'] || 'Eye Level',
+        movement: s.movement || s.cameraMovement || s['Movement'] || 'Static',
+        description: s.description || s.action || s['Description'] || 'No description',
+        location: s.location || 'TBD',
+        equipment: s.equipment || 'Standard Kit',
+        setupTime: s.setup_time || s.setupTime || '15 mins'
+      })) : [];
       
       setShots(prev => [...prev, ...formattedShots])
       setExplanation(`✨ ${result.data.disclaimer} - Generated ${formattedShots.length} shots.`)
@@ -478,6 +486,52 @@ function ShotListAI() {
       setExplanation('')
     }
   }
+
+  const duplicateShot = (index) => {
+    const shotToDuplicate = shots[index]
+    const newShot = {
+      ...shotToDuplicate,
+      id: `shot-copy-${Date.now()}`,
+      shotNumber: `${shotToDuplicate.shotNumber || index + 1}A` // Append 'A' to indicate variation
+    }
+    
+    // Insert after current shot
+    const newShots = [...shots]
+    newShots.splice(index + 1, 0, newShot)
+    setShots(newShots)
+  }
+
+  const exportToCSV = () => {
+    // Define headers
+    const headers = ['Scene Name', 'Scene #', 'Shot #', 'Shot Type', 'Angle', 'Movement', 'Description', 'Equipment', 'Setup Time', 'Location', 'Audio Notes']
+    
+    // Format rows
+    const rows = shots.map(s => [
+      s.sceneName,
+      s.sceneNumber,
+      s.shotNumber,
+      s.shotType,
+      s.cameraAngle,
+      s.movement, 
+      `"${s.description.replace(/"/g, '""')}"`, // Escape quotes
+      s.equipment,
+      s.setupTime,
+      s.location,
+      s.audioNotes
+    ].join(','))
+    
+    // Combine
+    const csvContent = [headers.join(','), ...rows].join('\n')
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `shot-list-${new Date().toISOString().slice(0,10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
   
   const exportToPDF = () => {
     // Simple text export (in production, use jsPDF)
@@ -512,12 +566,25 @@ function ShotListAI() {
       s.shotType?.includes('Close-Up')
     ).length
     
+    // Estimate total setup time
+    const totalMinutes = shots.reduce((acc, shot) => {
+      const timeStr = shot.setupTime || '15';
+      const minutes = parseInt(timeStr.replace(/[^0-9]/g, '')) || 15;
+      return acc + minutes;
+    }, 0);
+    
+    // Format hours and minutes
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const estimatedTime = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+
     const complexityScore = Math.min(100, (totalShots * 5) + (complexMovements * 15) + (closeUps * 3))
     
     return {
       totalShots,
       complexMovements,
       closeUps,
+      estimatedTime,
       score: complexityScore,
       level: complexityScore < 30 ? 'Simple' : complexityScore < 60 ? 'Moderate' : 'Complex'
     }
@@ -553,6 +620,7 @@ function ShotListAI() {
             <span>📹 {complexity.totalShots} shots</span>
             <span>🎥 {complexity.complexMovements} complex moves</span>
             <span>🔍 {complexity.closeUps} close-ups</span>
+            <span>⏱️ {complexity.estimatedTime} est. shoot</span>
           </div>
         </div>
       </div>
@@ -570,12 +638,20 @@ function ShotListAI() {
             </button>
             {shots.length > 0 && (
               <>
-                <button 
-                  className="btn btn-secondary btn-sm"
-                  onClick={exportToPDF}
-                >
-                  📄 Export
-                </button>
+                <div className="btn-group">
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={exportToPDF}
+                  >
+                    📄 PDF
+                  </button>
+                  <button 
+                    className="btn btn-secondary btn-sm"
+                    onClick={exportToCSV}
+                  >
+                    📊 CSV
+                  </button>
+                </div>
                 <button 
                   className="btn btn-secondary btn-sm danger"
                   onClick={clearAllShots}
@@ -690,6 +766,7 @@ function ShotListAI() {
                 index={index}
                 onUpdate={updateShot}
                 onDelete={deleteShot}
+                onDuplicate={duplicateShot}
               />
             ))
           )}
