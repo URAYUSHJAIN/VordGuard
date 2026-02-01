@@ -1,0 +1,29 @@
+{
+  "name": "vordguard-backend",
+  "version": "1.0.0",
+  "description": "VordGuard Studio - Production Crisis Management Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "film",
+    "production",
+    "crisis-management",
+    "decision-support"
+  ],
+  "author": "CineCode Hackathon",
+  "license": "MIT",
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/openai": "^2.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
